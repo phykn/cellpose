@@ -1,9 +1,8 @@
 # Cellpose DINO architecture and refactor contract
 
-The layout follows the responsibility boundaries in `D:/code/guide.md` and the
-user wiki's code/refactor guidance. Existing CLI options, plain model tensor
-names, configuration group names, and run weight filenames are retained.
-The source wiki is not modified by this refactor.
+The layout separates configuration, assembly, data preparation, model execution,
+training state, and prediction. Existing CLI options, plain model tensor names,
+configuration group names, and run weight filenames are retained.
 
 ## Ownership
 
@@ -30,6 +29,14 @@ inference mode and restores the previous model mode even if forward fails.
 
 `checkpoint.py` handles plain state dictionaries shared by assembly and training.
 `train.checkpoint` handles optimizer, scaler, step, configuration and RNG state.
+`config.check_model_config` owns the common backbone, stride and ordered-class
+compatibility rules, including omitted defaults. Plain weight loading reads its
+sidecar once; assembly delegates that check to the loader. Training-state loading
+applies the same rules to its embedded configuration before mutating the model.
+`config.prediction_config` owns the inference sidecar schema; the trainer only
+coordinates when weights, metadata and training state are saved. Training input
+paths are required by dataset assembly, so inference configurations do not need
+training images or masks.
 Segmentation-only tensor names and shapes are unchanged. The checkpoint reader accepts
 both the original three-field training checkpoint and version 2. Older code
 cannot read version 2 training state, but can still read the plain `model.pt`.
@@ -97,6 +104,13 @@ repository's complete model state dictionaries.
   implemented. Saved settings record restored optimizer hyperparameters.
 - Explicit device overrides take precedence over saved settings, and inference
   defaults to the weight's saved configuration rather than today's training YAML.
+- Saved configurations with omitted model defaults are treated like the equivalent
+  explicit settings during weight loading and resume. A default-only sidecar no
+  longer fails with `KeyError`, while different class orders, backbones and strides
+  remain incompatible.
+- Classification metadata with missing classifier tensors is rejected rather
+  than silently creating a random head during model initialization. Initializing
+  a classifier from a segmentation-only model remains supported.
 
 ## Evidence and limits
 

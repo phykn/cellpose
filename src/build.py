@@ -4,7 +4,6 @@ import torch
 from torch.utils.data import DataLoader
 
 from .checkpoint import load_weights
-from .config import find_prediction_config, load_yaml
 from .data.dataset import CellposeDataset
 from .model.cellpose import CellposeDINO
 from .model.dinov3 import build_dinov3
@@ -31,35 +30,20 @@ def build_model(
         num_classes=len(model_cfg.get("classes", [])),
     )
     if weights is not None:
-        classes = model_cfg.get("classes", [])
-        try:
-            saved = load_yaml(find_prediction_config(weights))["model"]
-        except FileNotFoundError:
-            if classes and not initialize_classifier:
-                raise ValueError(
-                    "classification weights require their saved model.yaml."
-                ) from None
-        else:
-            saved_classes = saved.get("classes", [])
-            if saved_classes != classes and not (
-                initialize_classifier and not saved_classes
-            ):
-                raise ValueError(
-                    "model.classes differs from the saved class names/order."
-                )
-            for key, default in (("backbone", "vitb16"), ("patch_stride", 8)):
-                if saved.get(key, default) != model_cfg.get(key, default):
-                    raise ValueError(
-                        f"model.{key} differs from the saved configuration."
-                    )
         load_weights(
-            weights, model, initialize_classifier=initialize_classifier, classes=classes
+            weights,
+            model,
+            initialize_classifier=initialize_classifier,
+            model_cfg=model_cfg,
         )
     return model
 
 
 def build_dataset(cfg: dict) -> CellposeDataset:
     data = cfg["data"]
+    for key in ("image_dir", "mask_dir"):
+        if data.get(key) is None:
+            raise ValueError(f"data.{key} is required for training.")
     return CellposeDataset(
         data["image_dir"],
         data["mask_dir"],

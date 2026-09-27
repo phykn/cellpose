@@ -49,6 +49,23 @@ def test_legacy_checkpoint_is_still_readable(tmp_path):
     assert load_checkpoint(path, model, optimizer) == 7
 
 
+@pytest.mark.parametrize("saved", [{}, {"model": {}}])
+def test_resume_accepts_equivalent_implicit_model_defaults(tmp_path, saved):
+    model = nn.Linear(2, 1)
+    optimizer = torch.optim.AdamW(model.parameters())
+    path = tmp_path / "checkpoint.pt"
+    save_checkpoint(path, model, optimizer, 3, cfg=saved)
+    assert (
+        load_checkpoint(
+            path,
+            model,
+            optimizer,
+            cfg={"model": {"backbone": "vitb16", "patch_stride": 8, "classes": []}},
+        )
+        == 3
+    )
+
+
 def test_resume_rejects_same_shape_different_stride_before_loading(tmp_path):
     model = nn.Linear(3, 1)
     optimizer = torch.optim.AdamW(model.parameters())

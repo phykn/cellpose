@@ -6,6 +6,8 @@ import numpy as np
 import torch
 from torch import nn
 
+from ..config import check_model_config
+
 
 def save_checkpoint(
     path: str | Path,
@@ -60,15 +62,7 @@ def load_checkpoint(
         raise ValueError(f"checkpoint step must be a non-negative integer: {path}")
     saved_cfg = state.get("config")
     if cfg is not None and saved_cfg is not None:
-        if cfg["model"].get("classes", []) != saved_cfg["model"].get("classes", []):
-            raise ValueError(
-                "resume model.classes differs from saved class names/order."
-            )
-        for key in ("backbone", "patch_stride"):
-            if cfg["model"].get(key) != saved_cfg["model"].get(key):
-                raise ValueError(
-                    f"resume model.{key} differs from saved configuration."
-                )
+        check_model_config(cfg.get("model", {}), saved_cfg.get("model", {}))
     model.load_state_dict(state["model"], strict=True)
     optimizer.load_state_dict(state["optimizer"])
     if scaler is not None and scaler.is_enabled() and state.get("scaler"):

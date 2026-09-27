@@ -156,6 +156,9 @@ def test_weights_and_resume_reject_reordered_classes(tmp_path, monkeypatch):
     path = tmp_path / "model.pt"
     save_weights(path, model)
     save_yaml(path.with_suffix(".yaml"), cfg)
+    load_weights(path, model, classes=["A", "B"])
+    with pytest.raises(ValueError, match="class names/order"):
+        load_weights(path, model, classes=["B", "A"])
     reordered = {"model": {**cfg["model"], "classes": ["B", "A"]}}
     with pytest.raises(ValueError, match="class names/order"):
         build.build_model(reordered, weights=path, load_backbone=False)
@@ -165,6 +168,20 @@ def test_weights_and_resume_reject_reordered_classes(tmp_path, monkeypatch):
         load_checkpoint(tmp_path / "checkpoint.pt", model, optimizer, cfg=reordered)
     path.with_suffix(".yaml").unlink()
     with pytest.raises(FileNotFoundError):
+        build.build_model(
+            cfg, weights=path, load_backbone=False, initialize_classifier=True
+        )
+
+
+def test_classifier_initialization_rejects_missing_saved_classifier(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(build, "build_dinov3", lambda *a, **kw: FakeEncoder())
+    cfg = {"model": {"classes": ["A", "B"]}}
+    path = tmp_path / "model.pt"
+    save_weights(path, CellposeDINO(FakeEncoder()))
+    save_yaml(path.with_suffix(".yaml"), cfg)
+    with pytest.raises(ValueError, match="missing classification head"):
         build.build_model(
             cfg, weights=path, load_backbone=False, initialize_classifier=True
         )

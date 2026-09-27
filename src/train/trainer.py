@@ -6,7 +6,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from ..checkpoint import save_weights
-from ..config import save_yaml
+from ..config import prediction_config, save_yaml
 from .checkpoint import save_checkpoint
 
 
@@ -98,18 +98,7 @@ class Trainer:
     def save(self, run_dir: Path) -> None:
         save_weights(run_dir / "model.pt", self.model)
         if self.cfg is not None:
-            save_yaml(
-                run_dir / "model.yaml",
-                {
-                    "format_version": 2 if self.cfg["model"].get("classes") else 1,
-                    "model": {**self.cfg["model"], "backbone_weights": None},
-                    "data": {
-                        "channel_axis": self.cfg["data"]["channel_axis"],
-                        "crop_size": self.cfg["data"]["crop_size"],
-                    },
-                    "predict": self.cfg["predict"],
-                },
-            )
+            save_yaml(run_dir / "model.yaml", prediction_config(self.cfg))
         save_checkpoint(
             run_dir / "checkpoint.pt",
             self.model,

@@ -23,12 +23,15 @@ Review and accept it before installing the dependency or using its weights.
 The pretrained weights require access through the
 [official DINOv3 repository](https://github.com/facebookresearch/dinov3#pretrained-models).
 
+Use Python 3.11 or newer. `requirements.txt` installs DINOv3 directly from
+the official GitHub repository at the API-checked commit; Git is not required.
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+python -m pip install -r requirements.txt
+python -m pip install -r requirements-dev.txt
 ```
 
 Select a DINOv3 ViT backbone with `model.backbone` in
@@ -139,9 +142,9 @@ input and parameter gradients.
 
 ```text
 src/
-  config.py              # settings, validation, project-relative paths
+  config.py              # settings, model compatibility, inference metadata, paths
   build.py               # model, loader, optimizer, trainer assembly
-  checkpoint.py          # plain inference state_dict IO
+  checkpoint.py          # plain weights and saved-model compatibility checks
   model/                 # DINOv3 encoder and dense Cellpose head
   data/                  # file IO, pairing, dataset, random augmentation
   prepare/               # shared normalization, padding, mask-to-flow math

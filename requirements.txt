@@ -1,4 +1,4 @@
-dinov3
+dinov3 @ https://github.com/facebookresearch/dinov3/archive/6876159a11b4df116f30f667f8c9888617df0751.zip
 numpy
 Pillow
 PyYAML
