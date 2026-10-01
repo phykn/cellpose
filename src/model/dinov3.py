@@ -4,27 +4,14 @@ from pathlib import Path
 import torch
 from torch import nn
 
-from .config import MODEL_DEFAULTS
-
-DINO_VIT_BACKBONES = (
-    "vits16",
-    "vits16plus",
-    "vitb16",
-    "vitl16",
-    "vith16plus",
-    "vit7b16",
-)
+from .config import MODEL_DEFAULTS, check_backbone
 
 
 def build_dinov3(
     weights: str | Path | None = None,
     model_name: str = MODEL_DEFAULTS["backbone"],
 ) -> nn.Module:
-    if not isinstance(model_name, str):
-        raise TypeError("model_name must be a string.")
-    if model_name not in DINO_VIT_BACKBONES:
-        choices = ", ".join(DINO_VIT_BACKBONES)
-        raise ValueError(f"model_name must be one of: {choices}.")
+    check_backbone(model_name)
 
     try:
         backbones = import_module("dinov3.hub.backbones")

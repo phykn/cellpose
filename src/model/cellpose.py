@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from .. import MODEL_STRIDE
+from .config import check_patch_stride
 
 
 class CellposeDINO(nn.Module):
@@ -21,10 +22,7 @@ class CellposeDINO(nn.Module):
             or num_classes < 0
         ):
             raise ValueError("num_classes must be a non-negative integer.")
-        if not isinstance(patch_stride, int) or isinstance(patch_stride, bool):
-            raise TypeError("patch_stride must be an integer.")
-        if patch_stride <= 0:
-            raise ValueError("patch_stride must be positive.")
+        check_patch_stride(patch_stride)
 
         try:
             projection = encoder.patch_embed.proj
@@ -34,12 +32,6 @@ class CellposeDINO(nn.Module):
             raise TypeError("encoder.patch_embed.proj must be Conv2d.")
         if projection.kernel_size != (16, 16):
             raise ValueError("only DINOv3 ViT/16 encoders are supported.")
-        if patch_stride > projection.kernel_size[0]:
-            raise ValueError("patch_stride must not exceed the patch size.")
-        if patch_stride % 2:
-            raise ValueError(
-                "patch_stride must be even to restore the input resolution."
-            )
 
         projection.stride = (patch_stride, patch_stride)
         padding = (projection.kernel_size[0] - patch_stride) // 2

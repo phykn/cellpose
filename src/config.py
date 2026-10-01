@@ -5,7 +5,8 @@ from pathlib import Path
 import torch
 import yaml
 
-from .model.config import MODEL_DEFAULTS
+from . import MODEL_STRIDE
+from .model.config import MODEL_DEFAULTS, validate_model_config
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = PROJECT_ROOT / "config" / "train.yaml"
@@ -88,13 +89,7 @@ def load_config(
 
 
 def validate_config(cfg: dict) -> None:
-    classes = cfg["model"]["classes"]
-    if not isinstance(classes, list) or any(
-        not isinstance(name, str) or not name.strip() for name in classes
-    ):
-        raise ValueError("model.classes must be a list of non-empty class names.")
-    if len(set(classes)) != len(classes):
-        raise ValueError("model.classes must not contain duplicate names.")
+    validate_model_config(cfg["model"])
     if cfg["train"]["resume"] is not None and cfg["train"]["weights"] is not None:
         raise ValueError("use either train.resume or train.weights, not both.")
     weight = cfg["train"]["class_loss_weight"]
@@ -112,7 +107,6 @@ def validate_config(cfg: dict) -> None:
         ("train", "total_steps", 1),
         ("train", "save_every_steps", 1),
         ("train", "seed", 0),
-        ("model", "patch_stride", 2),
         ("predict", "tile_size", 16),
         ("predict", "niter", 0),
         ("predict", "min_size", -1),
@@ -121,10 +115,8 @@ def validate_config(cfg: dict) -> None:
         if not isinstance(value, int) or isinstance(value, bool) or value < minimum:
             raise ValueError(f"{group}.{key} must be an integer >= {minimum}.")
     stride = cfg["model"]["patch_stride"]
-    if stride > 16 or stride % 2:
-        raise ValueError("model.patch_stride must be even and between 2 and 16.")
     for group, key in (("data", "crop_size"), ("predict", "tile_size")):
-        if cfg[group][key] % math.lcm(8, stride):
+        if cfg[group][key] % math.lcm(MODEL_STRIDE, stride):
             raise ValueError(f"{group}.{key} must be divisible by 8 and patch_stride.")
     for group, key in (("data", "augment"), ("train", "mixed_precision")):
         if not isinstance(cfg[group][key], bool):

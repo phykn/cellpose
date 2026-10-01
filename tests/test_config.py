@@ -21,6 +21,7 @@ def test_config_resolves_paths_and_preserves_explicit_precedence(tmp_path, monke
 @pytest.mark.parametrize(
     "cfg",
     [
+        {"model": {"backbone": "convnext_tiny"}},
         {"model": {"patch_stride": 3}},
         {"model": {"patch_stride": 16}, "data": {"crop_size": 24}},
         {"train": {"mixed_precision": "false"}},

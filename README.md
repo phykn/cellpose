@@ -161,8 +161,13 @@ prediction code. Internal imports have moved: `src.dataset` to
 See [architecture and upstream differences](docs/architecture.md) for the
 preserved contracts and intentional deviations.
 
-`model.config` owns model defaults, compatibility rules, and inference metadata;
-`checkpoint.find_prediction_config` locates that metadata beside saved weights.
+`model.config` owns model defaults, validation, compatibility rules, and inference
+metadata. `checkpoint.find_prediction_config` locates that metadata beside saved
+weights.
+Configuration loading and model assembly check backbone names, patch stride,
+and class vocabularies before allocating an encoder. `Trainer.restore` restores
+training state and keeps the effective optimizer settings in the saved
+configuration.
 `data.image.read_mask` decodes mask files without changing integer instance IDs,
 and `prepare.mask` owns shared mask validation and renumbering. Integer-valued
 floating masks remain accepted when their labels fit in int64.

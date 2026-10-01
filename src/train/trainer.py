@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from ..checkpoint import save_weights
 from ..config import save_yaml
 from ..model.config import prediction_config
-from .checkpoint import save_checkpoint
+from .checkpoint import load_checkpoint, save_checkpoint
 
 
 class BatchStream:
@@ -53,6 +53,21 @@ class Trainer:
         self.scaler = torch.amp.GradScaler("cuda", enabled=self.amp_enabled)
         self.step_idx = start_step
         self.cfg = cfg
+
+    def restore(self, path: str | Path) -> None:
+        self.step_idx = load_checkpoint(
+            path,
+            self.model,
+            self.optimizer,
+            device=self.device,
+            scaler=self.scaler,
+            cfg=self.cfg,
+        )
+        if self.cfg is not None:
+            self.cfg["optim"]["learning_rate"] = self.optimizer.param_groups[0]["lr"]
+            self.cfg["optim"]["weight_decay"] = self.optimizer.param_groups[0][
+                "weight_decay"
+            ]
 
     def fit(self, steps: int, save_every: int, run_dir: str | Path) -> None:
         if not isinstance(steps, int) or isinstance(steps, bool) or steps <= 0:

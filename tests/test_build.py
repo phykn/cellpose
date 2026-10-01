@@ -42,6 +42,32 @@ def test_build_model_passes_backbone_options(monkeypatch, tmp_path) -> None:
     assert model.patch_stride == 8
 
 
+@pytest.mark.parametrize(
+    "model_cfg, message",
+    [
+        ({"classes": "AB"}, "model.classes"),
+        ({"classes": ["A", "A"]}, "duplicate"),
+        ({"classes": [" "]}, "non-empty"),
+        ({"patch_stride": True}, "patch_stride"),
+        ({"patch_stride": 18}, "patch_stride"),
+        ({"backbone": "convnext_tiny"}, "backbone"),
+    ],
+)
+def test_invalid_model_settings_fail_before_encoder_allocation(
+    monkeypatch, model_cfg, message
+):
+    calls = []
+
+    def make_encoder(*args, **kwargs):
+        calls.append(True)
+        return FakeEncoder()
+
+    monkeypatch.setattr(build, "build_dinov3", make_encoder)
+    with pytest.raises((TypeError, ValueError), match=message):
+        build.build_model({"model": model_cfg}, load_backbone=False)
+    assert not calls
+
+
 @pytest.mark.parametrize("saved", [{}, {"model": {}}])
 def test_weights_accept_default_only_saved_configuration(monkeypatch, tmp_path, saved):
     monkeypatch.setattr(build, "build_dinov3", lambda *a, **kw: FakeEncoder())

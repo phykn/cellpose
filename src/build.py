@@ -6,9 +6,8 @@ from torch.utils.data import DataLoader
 from .checkpoint import load_weights
 from .data.dataset import CellposeDataset
 from .model.cellpose import CellposeDINO
-from .model.config import MODEL_DEFAULTS
+from .model.config import MODEL_DEFAULTS, validate_model_config
 from .model.dinov3 import build_dinov3
-from .train.checkpoint import load_checkpoint
 from .train.loss import CellposeLoss
 from .train.trainer import BatchStream, Trainer
 
@@ -20,6 +19,7 @@ def build_model(
     initialize_classifier: bool = False,
 ) -> CellposeDINO:
     model_cfg = MODEL_DEFAULTS | cfg["model"]
+    validate_model_config(model_cfg)
     backbone_weights = model_cfg["backbone_weights"] if load_backbone else None
     encoder = build_dinov3(
         backbone_weights,
@@ -108,9 +108,5 @@ def build_trainer(cfg: dict, device: torch.device) -> Trainer:
         cfg=cfg,
     )
     if resume is not None:
-        trainer.step_idx = load_checkpoint(
-            resume, model, optimizer, device=device, scaler=trainer.scaler, cfg=cfg
-        )
-        cfg["optim"]["learning_rate"] = optimizer.param_groups[0]["lr"]
-        cfg["optim"]["weight_decay"] = optimizer.param_groups[0]["weight_decay"]
+        trainer.restore(resume)
     return trainer

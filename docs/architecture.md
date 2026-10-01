@@ -33,14 +33,20 @@ inference mode and restores the previous model mode even if forward fails.
 
 `checkpoint.py` handles plain state dictionaries shared by assembly and training.
 `train.checkpoint` handles optimizer, scaler, step, configuration and RNG state.
-`model.config` owns model defaults and the common backbone, stride and ordered-class
-compatibility rules, including omitted defaults. Assembly and the DINOv3 builder
-use these same model defaults. `checkpoint.find_prediction_config` owns sidecar
+`model.config` owns model defaults, supported backbone names, patch stride and
+class vocabulary validation, and compatibility rules including omitted defaults.
+Configuration loading and assembly use the same validation before allocating an
+encoder; model construction and the DINOv3 builder reuse the stride and backbone
+checks. `checkpoint.find_prediction_config` owns sidecar
 discovery. Plain weight loading reads its
 sidecar once; assembly delegates that check to the loader. Training-state loading
 applies the same rules to its embedded configuration before mutating the model.
-`model.config.prediction_config` owns the inference sidecar schema; the trainer only
-coordinates when weights, metadata and training state are saved. Training input
+`model.config.prediction_config` owns the inference sidecar schema. The trainer
+coordinates training-state restoration and saving: `Trainer.restore` restores the
+model, optimizer, scaler, RNG and completed step, then records the restored
+optimizer settings in its effective configuration. Assembly only requests the
+restore; it does not manipulate the trainer's scaler or completed step.
+`Trainer.save` exports weights, metadata and training state. Training input
 paths are required by dataset assembly, so inference configurations do not need
 training images or masks.
 Segmentation-only tensor names and shapes are unchanged. The checkpoint reader accepts
@@ -120,6 +126,10 @@ repository's complete model state dictionaries.
 - Classification metadata with missing classifier tensors is rejected rather
   than silently creating a random head during model initialization. Initializing
   a classifier from a segmentation-only model remains supported.
+- Model assembly rejects malformed class vocabularies before allocating the
+  encoder. Previously a string such as `"AB"` could silently create a two-class
+  head, and duplicate or blank class names were accepted by that path.
+  Configuration loading also rejects unsupported backbone names immediately.
 
 ## Evidence and limits
 

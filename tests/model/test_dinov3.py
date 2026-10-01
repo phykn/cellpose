@@ -4,7 +4,8 @@ import pytest
 import torch
 from torch import nn
 
-from src.model.dinov3 import DINO_VIT_BACKBONES, build_dinov3
+from src.model.config import DINO_VIT_BACKBONES
+from src.model.dinov3 import build_dinov3
 
 
 def test_supported_dino_vit_backbones_are_explicit() -> None:
@@ -19,7 +20,7 @@ def test_supported_dino_vit_backbones_are_explicit() -> None:
 
 
 def test_unknown_dino_backbone_fails_before_import() -> None:
-    with pytest.raises(ValueError, match="model_name must be one of"):
+    with pytest.raises(ValueError, match="backbone must be one of"):
         build_dinov3(model_name="convnext_tiny")
 
 
