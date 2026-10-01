@@ -5,7 +5,8 @@ from pathlib import Path
 import torch
 
 from src.build import build_model
-from src.config import find_prediction_config, load_config
+from src.checkpoint import find_prediction_config
+from src.config import load_config
 from src.data.image import read_array, write_mask
 from src.predict.inference import predict
 

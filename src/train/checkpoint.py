@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch import nn
 
-from ..config import check_model_config
+from ..model.config import check_model_config
 
 
 def save_checkpoint(

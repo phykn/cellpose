@@ -4,6 +4,8 @@ from pathlib import Path
 import torch
 from torch import nn
 
+from .config import MODEL_DEFAULTS
+
 DINO_VIT_BACKBONES = (
     "vits16",
     "vits16plus",
@@ -16,7 +18,7 @@ DINO_VIT_BACKBONES = (
 
 def build_dinov3(
     weights: str | Path | None = None,
-    model_name: str = "vitb16",
+    model_name: str = MODEL_DEFAULTS["backbone"],
 ) -> nn.Module:
     if not isinstance(model_name, str):
         raise TypeError("model_name must be a string.")

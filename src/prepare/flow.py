@@ -4,6 +4,8 @@
 import numpy as np
 from scipy.ndimage import find_objects
 
+from .mask import check_masks, renumber_masks
+
 NEIGHBOR_OFFSETS = np.array(
     (
         (0, 0),
@@ -25,9 +27,9 @@ def masks_to_flows(
     niter: int | None = None,
 ) -> np.ndarray:
     """Convert labelled 2D masks to normalized inward Y/X flows."""
-    masks = _check_masks(masks)
-    niter = _check_niter(niter, allow_none=True)
-    labels = _renumber(masks)
+    masks = check_masks(masks)
+    niter = check_niter(niter, allow_none=True)
+    labels = renumber_masks(masks)
     flows = np.zeros((2, *labels.shape), dtype=np.float32)
     if not np.any(labels):
         return flows
@@ -84,28 +86,7 @@ def _mask_centers(masks: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     return np.asarray(centers, dtype=np.intp), np.asarray(extents, dtype=np.intp)
 
 
-def _renumber(masks: np.ndarray) -> np.ndarray:
-    values, inverse = np.unique(masks, return_inverse=True)
-    labels = np.zeros(len(values), dtype=np.int32)
-    labels[values > 0] = np.arange(1, np.count_nonzero(values > 0) + 1)
-    return labels[inverse].reshape(masks.shape)
-
-
-def _check_masks(masks: np.ndarray) -> np.ndarray:
-    if not isinstance(masks, np.ndarray):
-        raise TypeError("masks must be a NumPy array.")
-    if masks.ndim != 2:
-        raise ValueError("masks must have shape [H, W].")
-    if 0 in masks.shape:
-        raise ValueError("masks must have non-empty spatial dimensions.")
-    if not np.issubdtype(masks.dtype, np.integer):
-        raise TypeError("masks must use an integer dtype.")
-    if np.any(masks < 0):
-        raise ValueError("masks must contain non-negative labels.")
-    return masks
-
-
-def _check_niter(
+def check_niter(
     niter: int | None,
     allow_none: bool = False,
 ) -> int | None:

@@ -6,7 +6,8 @@ import torch
 from scipy.ndimage import binary_fill_holes, maximum_filter
 
 from .. import FLOW_SCALE
-from ..prepare.flow import _check_niter, _renumber, masks_to_flows
+from ..prepare.flow import check_niter, masks_to_flows
+from ..prepare.mask import renumber_masks
 
 
 def follow_flows(
@@ -18,7 +19,7 @@ def follow_flows(
     """Follow 2D flows from every foreground pixel with bilinear Euler steps."""
     flows = _check_flows(flows)
     cell_mask = _check_cell_mask(cell_mask, flows.shape[1:])
-    niter = _check_niter(niter)
+    niter = check_niter(niter)
     inds = np.nonzero(cell_mask)
     if len(inds[0]) == 0:
         return np.zeros((2, 0), dtype=np.float32)
@@ -63,7 +64,7 @@ def compute_masks(
     """Reconstruct labelled masks from raw Cellpose flow and cell logits."""
     flow_logits = _check_flows(flow_logits, name="flow_logits")
     cellprob_logits = _check_logits(cellprob_logits, flow_logits.shape[1:])
-    niter = _check_niter(niter)
+    niter = check_niter(niter)
     cellprob_threshold = _check_number(
         cellprob_threshold,
         "cellprob_threshold",
@@ -148,7 +149,7 @@ def _masks_from_endpoints(
     large = large[large != 0]
     if len(large):
         masks[np.isin(masks, large)] = 0
-    return _renumber(masks)
+    return renumber_masks(masks)
 
 
 def _remove_bad_flow_masks(
@@ -167,7 +168,7 @@ def _remove_bad_flow_masks(
     if bad:
         masks = masks.copy()
         masks[np.isin(masks, bad)] = 0
-    return _renumber(masks)
+    return renumber_masks(masks)
 
 
 def _fill_and_filter_masks(masks: np.ndarray, min_size: int) -> np.ndarray:

@@ -4,7 +4,8 @@ from pathlib import Path
 import torch
 from torch import nn
 
-from .config import check_model_config, find_prediction_config, load_yaml
+from .config import load_yaml
+from .model.config import check_model_config
 
 
 def save_weights(path: str | Path, model: nn.Module) -> None:
@@ -75,3 +76,11 @@ def load_weights(
             }
         )
     model.load_state_dict(state, strict=True)
+
+
+def find_prediction_config(weights: str | Path) -> Path:
+    weights = Path(weights)
+    for path in (weights.with_suffix(".yaml"), weights.parent / "train.yaml"):
+        if path.is_file():
+            return path
+    raise FileNotFoundError("weights have no saved configuration; pass --config.")

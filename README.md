@@ -142,12 +142,12 @@ input and parameter gradients.
 
 ```text
 src/
-  config.py              # settings, model compatibility, inference metadata, paths
+  config.py              # runtime settings, validation, YAML IO, project paths
   build.py               # model, loader, optimizer, trainer assembly
-  checkpoint.py          # plain weights and saved-model compatibility checks
-  model/                 # DINOv3 encoder and dense Cellpose head
+  checkpoint.py          # plain weights, sidecar discovery, compatibility checks
+  model/                 # DINOv3 encoder, dense head, defaults and metadata contract
   data/                  # file IO, pairing, dataset, random augmentation
-  prepare/               # shared normalization, padding, mask-to-flow math
+  prepare/               # shared normalization, padding, mask validation and flow math
   train/                 # trainer, loss, resumable checkpoint state
   predict/               # inference, tile blending, flow-to-mask dynamics
 ```
@@ -160,6 +160,12 @@ prediction code. Internal imports have moved: `src.dataset` to
 `src.train.trainer`. No internal compatibility aliases are kept.
 See [architecture and upstream differences](docs/architecture.md) for the
 preserved contracts and intentional deviations.
+
+`model.config` owns model defaults, compatibility rules, and inference metadata;
+`checkpoint.find_prediction_config` locates that metadata beside saved weights.
+`data.image.read_mask` decodes mask files without changing integer instance IDs,
+and `prepare.mask` owns shared mask validation and renumbering. Integer-valued
+floating masks remain accepted when their labels fit in int64.
 
 ## Tests
 

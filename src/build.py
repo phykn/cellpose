@@ -6,6 +6,7 @@ from torch.utils.data import DataLoader
 from .checkpoint import load_weights
 from .data.dataset import CellposeDataset
 from .model.cellpose import CellposeDINO
+from .model.config import MODEL_DEFAULTS
 from .model.dinov3 import build_dinov3
 from .train.checkpoint import load_checkpoint
 from .train.loss import CellposeLoss
@@ -18,16 +19,16 @@ def build_model(
     load_backbone: bool = True,
     initialize_classifier: bool = False,
 ) -> CellposeDINO:
-    model_cfg = cfg["model"]
-    backbone_weights = model_cfg.get("backbone_weights") if load_backbone else None
+    model_cfg = MODEL_DEFAULTS | cfg["model"]
+    backbone_weights = model_cfg["backbone_weights"] if load_backbone else None
     encoder = build_dinov3(
         backbone_weights,
-        model_name=model_cfg.get("backbone", "vitb16"),
+        model_name=model_cfg["backbone"],
     )
     model = CellposeDINO(
         encoder,
-        patch_stride=model_cfg.get("patch_stride", 8),
-        num_classes=len(model_cfg.get("classes", [])),
+        patch_stride=model_cfg["patch_stride"],
+        num_classes=len(model_cfg["classes"]),
     )
     if weights is not None:
         load_weights(

@@ -4,6 +4,8 @@ import numpy as np
 import tifffile
 from PIL import Image
 
+from ..prepare.mask import check_masks
+
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".npy", ".png", ".tif", ".tiff"}
 
 
@@ -24,6 +26,21 @@ def read_array(path: str | Path) -> np.ndarray:
     if not isinstance(array, np.ndarray) or not np.issubdtype(array.dtype, np.number):
         raise TypeError(f"image must contain a numeric array: {path}")
     return array
+
+
+def read_mask(path: str | Path) -> np.ndarray:
+    masks = read_array(path)
+    if masks.ndim != 2:
+        raise ValueError(f"instance mask must be two-dimensional: {path}")
+    if np.issubdtype(masks.dtype, np.floating):
+        if not np.isfinite(masks).all():
+            raise ValueError(f"instance mask must contain finite labels: {path}")
+        if not np.equal(masks, np.floor(masks)).all():
+            raise TypeError(f"instance mask must contain integer labels: {path}")
+        if masks.max(initial=0) >= 2**63 or masks.min(initial=0) < -(2**63):
+            raise ValueError(f"floating mask labels exceed the int64 range: {path}")
+        masks = masks.astype(np.int64)
+    return check_masks(masks)
 
 
 def write_mask(path: str | Path, masks: np.ndarray) -> None:

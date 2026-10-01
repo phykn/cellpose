@@ -8,7 +8,7 @@ from .. import MODEL_STRIDE
 from ..prepare.convert import normalize_image
 from ..prepare.flow import flow_targets
 from .augment import crop_pair
-from .image import find_pairs, read_array
+from .image import find_pairs, read_array, read_mask
 from .label import class_target, read_labels
 
 
@@ -56,21 +56,7 @@ class CellposeDataset(Dataset):
             read_array(image_path),
             channel_axis=self.channel_axis,
         )
-        masks = read_array(mask_path)
-        if masks.ndim != 2:
-            raise ValueError(f"instance mask must be two-dimensional: {mask_path}")
-        integer_labels = (
-            np.issubdtype(masks.dtype, np.integer)
-            or np.equal(
-                masks,
-                np.floor(masks),
-            ).all()
-        )
-        if not integer_labels:
-            raise TypeError(f"instance mask must contain integer labels: {mask_path}")
-        masks = masks.astype(np.int64, copy=False)
-        if masks.min(initial=0) < 0:
-            raise ValueError(f"instance mask labels must be non-negative: {mask_path}")
+        masks = read_mask(mask_path)
         if image.shape[-2:] != masks.shape:
             raise ValueError(
                 f"image and mask shapes do not match: {image_path}, {mask_path}"

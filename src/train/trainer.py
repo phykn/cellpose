@@ -6,7 +6,8 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from ..checkpoint import save_weights
-from ..config import prediction_config, save_yaml
+from ..config import save_yaml
+from ..model.config import prediction_config
 from .checkpoint import save_checkpoint
 
 

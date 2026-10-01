@@ -5,15 +5,12 @@ from pathlib import Path
 import torch
 import yaml
 
+from .model.config import MODEL_DEFAULTS
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG = PROJECT_ROOT / "config" / "train.yaml"
 DEFAULTS = {
-    "model": {
-        "backbone": "vitb16",
-        "backbone_weights": None,
-        "patch_stride": 8,
-        "classes": [],
-    },
+    "model": MODEL_DEFAULTS,
     "data": {
         "channel_axis": None,
         "crop_size": 384,
@@ -157,39 +154,6 @@ def validate_config(cfg: dict) -> None:
         raise ValueError("predict.max_size_fraction must be in (0, 1].")
     if pred["flow_threshold"] is not None and pred["flow_threshold"] < 0:
         raise ValueError("predict.flow_threshold must be non-negative or null.")
-
-
-def check_model_config(
-    model: dict, saved: dict, initialize_classifier: bool = False
-) -> None:
-    defaults = DEFAULTS["model"]
-    classes = model.get("classes", defaults["classes"])
-    saved_classes = saved.get("classes", defaults["classes"])
-    if classes != saved_classes and not (initialize_classifier and not saved_classes):
-        raise ValueError("model.classes differs from the saved class names/order.")
-    for key in ("backbone", "patch_stride"):
-        if model.get(key, defaults[key]) != saved.get(key, defaults[key]):
-            raise ValueError(f"model.{key} differs from the saved configuration.")
-
-
-def prediction_config(cfg: dict) -> dict:
-    return {
-        "format_version": 2 if cfg["model"].get("classes") else 1,
-        "model": {**cfg["model"], "backbone_weights": None},
-        "data": {
-            "channel_axis": cfg["data"]["channel_axis"],
-            "crop_size": cfg["data"]["crop_size"],
-        },
-        "predict": cfg["predict"],
-    }
-
-
-def find_prediction_config(weights: str | Path) -> Path:
-    weights = Path(weights)
-    for path in (weights.with_suffix(".yaml"), weights.parent / "train.yaml"):
-        if path.is_file():
-            return path
-    raise FileNotFoundError("weights have no saved configuration; pass --config.")
 
 
 def load_yaml(path: str | Path) -> dict:

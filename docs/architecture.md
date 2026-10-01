@@ -11,9 +11,13 @@ configuration group names, and run weight filenames are retained.
 `run_predict.py` selects the saved inference configuration, assembles the model,
 decodes the input, invokes prediction, and saves the integer mask.
 
-`data.image` owns file decoding, encoding, and stem pairing. `data.dataset`
+`data.image` owns file decoding, encoding, mask-file validation, and stem pairing.
+It preserves integer mask IDs and converts integer-valued floating masks only
+after checking finiteness and the int64 range. `data.dataset`
 reads each pair and invokes common normalization, paired crop/augmentation,
-and flow-target generation in that order. `prepare.flow` owns the shared
+and flow-target generation in that order. `prepare.mask` owns validation of
+integer mask arrays and renumbering, independently of flow calculations.
+`prepare.flow` owns the shared
 mask-to-flow conversion used both to create training targets and to check
 predicted masks. `predict.dynamics` owns endpoint integration, instance
 construction, flow consistency filtering, hole filling, and size filtering.
@@ -29,11 +33,13 @@ inference mode and restores the previous model mode even if forward fails.
 
 `checkpoint.py` handles plain state dictionaries shared by assembly and training.
 `train.checkpoint` handles optimizer, scaler, step, configuration and RNG state.
-`config.check_model_config` owns the common backbone, stride and ordered-class
-compatibility rules, including omitted defaults. Plain weight loading reads its
+`model.config` owns model defaults and the common backbone, stride and ordered-class
+compatibility rules, including omitted defaults. Assembly and the DINOv3 builder
+use these same model defaults. `checkpoint.find_prediction_config` owns sidecar
+discovery. Plain weight loading reads its
 sidecar once; assembly delegates that check to the loader. Training-state loading
 applies the same rules to its embedded configuration before mutating the model.
-`config.prediction_config` owns the inference sidecar schema; the trainer only
+`model.config.prediction_config` owns the inference sidecar schema; the trainer only
 coordinates when weights, metadata and training state are saved. Training input
 paths are required by dataset assembly, so inference configurations do not need
 training images or masks.
@@ -95,6 +101,9 @@ repository's complete model state dictionaries.
   and may affect reconstructed masks; the network and loss contract is unchanged.
 - PNG export rejects instance IDs above 65535 rather than wrapping to background
   or a different instance. TIFF and NumPy retain larger labels.
+- Mask loading preserves uint64 instance IDs above the int64 range. Previously,
+  training converted them to negative IDs and rejected valid masks. Classification
+  annotations retain the original IDs through cropping and target generation.
 - Local DINO weights are read directly with strict loading rather than through
   the hub's filename cache, which can confuse different files sharing a basename.
 - Tile accumulation avoids half-precision overlap overflow and repeated

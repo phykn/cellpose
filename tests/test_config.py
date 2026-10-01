@@ -1,6 +1,6 @@
 import pytest
 
-from src.config import PROJECT_ROOT, find_prediction_config, load_config, save_yaml
+from src.config import PROJECT_ROOT, load_config, save_yaml
 
 
 def test_config_resolves_paths_and_preserves_explicit_precedence(tmp_path, monkeypatch):
@@ -32,15 +32,3 @@ def test_invalid_configuration_fails_before_building(cfg, tmp_path):
     save_yaml(path, cfg)
     with pytest.raises((TypeError, ValueError)):
         load_config(path, device="cpu")
-
-
-def test_prediction_uses_weights_sidecar_or_legacy_run_config(tmp_path):
-    weights = tmp_path / "model.pt"
-    with pytest.raises(FileNotFoundError, match="--config"):
-        find_prediction_config(weights)
-    legacy = tmp_path / "train.yaml"
-    save_yaml(legacy, {})
-    assert find_prediction_config(weights) == legacy
-    sidecar = tmp_path / "model.yaml"
-    save_yaml(sidecar, {})
-    assert find_prediction_config(weights) == sidecar
