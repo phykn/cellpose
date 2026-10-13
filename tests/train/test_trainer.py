@@ -1,6 +1,7 @@
 import json
 from copy import deepcopy
 
+import pytest
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
@@ -161,3 +162,63 @@ def test_training_matches_manual_updates_across_epochs(tmp_path):
     assert metrics == [
         {"step": step, "loss": loss} for step, loss in enumerate(losses, 1)
     ]
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf")])
+def test_nonfinite_loss_does_not_update_or_save_training_state(tmp_path, value):
+    images = torch.ones(1, 3, 8, 8)
+    targets = torch.full_like(images, value)
+    loader = DataLoader(TensorDataset(images, targets), batch_size=1)
+    trainer, model, optimizer = make_trainer(loader)
+    expected = deepcopy(model.state_dict())
+
+    with pytest.raises(FloatingPointError, match="non-finite loss"):
+        trainer.fit(steps=1, save_every=1, run_dir=tmp_path)
+
+    assert trainer.step_idx == 0
+    assert optimizer.state == {}
+    assert not (tmp_path / "checkpoint.pt").exists()
+    assert not (tmp_path / "metrics.jsonl").exists()
+    for key, value in model.state_dict().items():
+        torch.testing.assert_close(value, expected[key], rtol=0, atol=0)
+
+
+def test_nonfinite_gradients_do_not_update_training_state(tmp_path):
+    trainer, model, optimizer = make_trainer()
+    expected = deepcopy(model.state_dict())
+    model.weight.register_hook(lambda grad: torch.full_like(grad, float("inf")))
+
+    with pytest.raises(FloatingPointError, match="non-finite gradients"):
+        trainer.fit(steps=1, save_every=1, run_dir=tmp_path)
+
+    assert trainer.step_idx == 0
+    assert optimizer.state == {}
+    assert not (tmp_path / "checkpoint.pt").exists()
+    for key, value in model.state_dict().items():
+        torch.testing.assert_close(value, expected[key], rtol=0, atol=0)
+
+
+def test_amp_overflow_skips_update_reduces_scale_and_recovers_on_cpu():
+    images = torch.ones(2, 3, 8, 8)
+    loader = DataLoader(TensorDataset(images, torch.zeros_like(images)), batch_size=1)
+    trainer, model, optimizer = make_trainer(loader)
+    # Exercise the AMP branch with the real CPU scaler without requiring CUDA.
+    trainer.amp_enabled = True
+    trainer.scaler = torch.amp.GradScaler("cpu", init_scale=128.0)
+    expected = deepcopy(model.state_dict())
+    hook = model.weight.register_hook(lambda grad: torch.full_like(grad, float("inf")))
+
+    loss = trainer.step()
+
+    assert torch.isfinite(torch.tensor(loss))
+    assert trainer.scaler.get_scale() == 64.0
+    assert optimizer.state == {}
+    for key, value in model.state_dict().items():
+        torch.testing.assert_close(value, expected[key], rtol=0, atol=0)
+
+    hook.remove()
+    trainer.step()
+
+    assert optimizer.state
+    assert trainer.scaler.get_scale() == 64.0
+    assert not torch.equal(model.weight, expected["weight"])

@@ -47,8 +47,7 @@ def write_mask(path: str | Path, masks: np.ndarray) -> None:
     path = Path(path)
     if masks.ndim != 2 or not np.issubdtype(masks.dtype, np.integer):
         raise ValueError("masks must be a two-dimensional integer array.")
-    if np.any(masks < 0):
-        raise ValueError("mask labels must be non-negative.")
+    check_masks(masks)
     if path.suffix.lower() == ".png" and masks.max(initial=0) > 65535:
         raise ValueError("PNG supports labels up to 65535; use .npy or .tiff.")
     path.parent.mkdir(parents=True, exist_ok=True)

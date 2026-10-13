@@ -5,6 +5,7 @@ import pytest
 import torch
 from torch import nn
 
+from src.checkpoint import load_weights, save_weights
 from src.train.checkpoint import load_checkpoint, save_checkpoint
 
 
@@ -84,3 +85,38 @@ def test_resume_rejects_same_shape_different_stride_before_loading(tmp_path):
             optimizer,
             cfg={"model": {"backbone": "vitb16", "patch_stride": 16}},
         )
+
+
+@pytest.mark.parametrize("checkpoint", [False, True])
+def test_failed_save_preserves_previous_model(tmp_path, monkeypatch, checkpoint):
+    model = nn.Linear(3, 1)
+    optimizer = torch.optim.AdamW(model.parameters())
+    path = tmp_path / "model.pt"
+    expected = {key: value.clone() for key, value in model.state_dict().items()}
+    if checkpoint:
+        save_checkpoint(path, model, optimizer, 3)
+    else:
+        save_weights(path, model)
+    original = path.read_bytes()
+    with torch.no_grad():
+        model.weight.add_(1)
+
+    def failed_save(obj, target):
+        target.write_bytes(b"partial checkpoint")
+        raise OSError("disk full")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(torch, "save", failed_save)
+        with pytest.raises(OSError, match="disk full"):
+            if checkpoint:
+                save_checkpoint(path, model, optimizer, 4)
+            else:
+                save_weights(path, model)
+
+    assert path.read_bytes() == original
+    if checkpoint:
+        assert load_checkpoint(path, model, optimizer) == 3
+    else:
+        load_weights(path, model)
+    for key, value in model.state_dict().items():
+        torch.testing.assert_close(value, expected[key], rtol=0, atol=0)

@@ -17,6 +17,31 @@ from src.train.loss import CellposeLoss
 from tests.model.test_cellpose import FakeEncoder
 
 
+@pytest.mark.parametrize(
+    "masks, message",
+    [
+        (np.array([[0, 1.5]]), "integer"),
+        (np.array([[0, -1]], dtype=np.int32), "non-negative"),
+        (np.zeros((1, 2, 3), dtype=np.int32), "shape"),
+    ],
+)
+def test_instance_scoring_rejects_invalid_mask_labels(masks, message):
+    with pytest.raises((TypeError, ValueError), match=message):
+        classify_instances(masks, np.zeros((2, *masks.shape)), ("A", "B"))
+
+
+@pytest.mark.parametrize(
+    "logits",
+    [
+        np.array([[[1j]], [[2j]]], dtype=np.complex64),
+        np.array([[[np.iinfo(np.int64).min]], [[np.iinfo(np.int64).max]]]),
+    ],
+)
+def test_instance_scoring_rejects_nonfloating_logits(logits):
+    with pytest.raises(TypeError, match="floating"):
+        classify_instances(np.ones((1, 1), dtype=np.int32), logits, ("A", "B"))
+
+
 @pytest.mark.parametrize("kind", ["empty", "full", "sparse"])
 def test_instance_targets_and_scores_preserve_original_ids(kind):
     from scipy.special import softmax

@@ -194,10 +194,17 @@ def _check_flows(flows: np.ndarray, name: str = "flows") -> np.ndarray:
         raise ValueError(f"{name} must have shape [2, H, W].")
     if 0 in flows.shape[1:]:
         raise ValueError(f"{name} must have non-empty spatial dimensions.")
-    if not np.issubdtype(flows.dtype, np.number):
-        raise TypeError(f"{name} must use a numeric dtype.")
+    if not (
+        np.issubdtype(flows.dtype, np.integer)
+        or np.issubdtype(flows.dtype, np.floating)
+    ):
+        raise TypeError(f"{name} must use a real numeric dtype.")
     if not np.isfinite(flows).all():
         raise ValueError(f"{name} must contain only finite values.")
+    if np.issubdtype(flows.dtype, np.floating) and flows.dtype.itemsize > 4:
+        limit = np.finfo(np.float32).max
+        if np.any(flows > limit) or np.any(flows < -limit):
+            raise ValueError(f"{name} values must fit within the float32 range.")
     return flows
 
 
@@ -221,8 +228,11 @@ def _check_logits(logits: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
         raise TypeError("cellprob_logits must be a NumPy array.")
     if logits.shape != shape:
         raise ValueError("cellprob_logits shape must match flow_logits spatial shape.")
-    if not np.issubdtype(logits.dtype, np.number):
-        raise TypeError("cellprob_logits must use a numeric dtype.")
+    if not (
+        np.issubdtype(logits.dtype, np.integer)
+        or np.issubdtype(logits.dtype, np.floating)
+    ):
+        raise TypeError("cellprob_logits must use a real numeric dtype.")
     if not np.isfinite(logits).all():
         raise ValueError("cellprob_logits must contain only finite values.")
     return logits

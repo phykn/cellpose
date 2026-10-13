@@ -95,7 +95,23 @@ class Trainer:
         ):
             prediction = self.model(image)
             loss = self.criterion(prediction, target)
+        if not torch.isfinite(loss):
+            raise FloatingPointError(
+                f"non-finite loss at training step {self.step_idx + 1}."
+            )
         self.scaler.scale(loss).backward()
+        if not self.amp_enabled:
+            gradients = (
+                param.grad
+                for group in self.optimizer.param_groups
+                for param in group["params"]
+                if param.grad is not None
+            )
+            norm = torch.nn.utils.get_total_norm(gradients, norm_type=float("inf"))
+            if not torch.isfinite(norm):
+                raise FloatingPointError(
+                    f"non-finite gradients at training step {self.step_idx + 1}."
+                )
         self.scaler.step(self.optimizer)
         self.scaler.update()
         return float(loss.detach())

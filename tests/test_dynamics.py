@@ -71,6 +71,22 @@ def test_invalid_inputs_are_rejected_early() -> None:
         )
 
 
+@pytest.mark.parametrize("dtype", [np.complex64, np.complex128])
+def test_dynamics_rejects_complex_fields_and_logits(dtype):
+    flows = np.zeros((2, 8, 8), dtype=dtype)
+    mask = np.ones((8, 8), dtype=bool)
+    with pytest.raises(TypeError, match="real"):
+        follow_flows(flows, mask)
+    with pytest.raises(TypeError, match="real"):
+        compute_masks(flows.real, np.zeros(mask.shape, dtype=dtype))
+
+
+def test_flow_tracking_rejects_values_outside_float32_range():
+    flows = np.full((2, 8, 8), 1e300, dtype=np.float64)
+    with pytest.raises(ValueError, match="float32"):
+        follow_flows(flows, np.ones((8, 8), dtype=bool), niter=2)
+
+
 def test_mask_flows_are_unit_normalized_and_point_inward() -> None:
     center = (16, 16)
     foreground = disk((33, 33), center, 8)

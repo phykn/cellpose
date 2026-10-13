@@ -4,4 +4,5 @@ Pillow
 PyYAML
 scipy
 tifffile
-torch
+# Patched weights_only deserialization (GHSA-63cw-57p8-fm3p).
+torch>=2.10.0

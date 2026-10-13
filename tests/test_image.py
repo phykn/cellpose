@@ -66,3 +66,14 @@ def test_read_mask_rejects_invalid_labels_before_conversion(
     np.save(path, mask)
     with pytest.raises(error, match=message):
         read_mask(path)
+
+
+@pytest.mark.parametrize("suffix", [".npy", ".png", ".tiff"])
+@pytest.mark.parametrize("shape", [(0, 2), (2, 0)])
+def test_mask_output_rejects_empty_dimensions_before_creating_files(
+    tmp_path, suffix, shape
+):
+    path = tmp_path / "new" / f"mask{suffix}"
+    with pytest.raises(ValueError, match="non-empty"):
+        write_mask(path, np.zeros(shape, dtype=np.uint16))
+    assert not path.parent.exists()
