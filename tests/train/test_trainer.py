@@ -1,21 +1,25 @@
+import json
+from copy import deepcopy
+
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from src.checkpoint import load_weights
 from src.config import load_config, load_yaml, save_yaml
-from src.train.trainer import BatchStream, Trainer
+from src.train.trainer import Trainer
 
 
-def make_trainer() -> tuple[Trainer, nn.Module, torch.optim.Optimizer]:
+def make_trainer(loader=None) -> tuple[Trainer, nn.Module, torch.optim.Optimizer]:
     model = nn.Conv2d(3, 3, 1)
-    images = torch.randn(2, 3, 8, 8)
-    targets = torch.zeros_like(images)
-    loader = DataLoader(TensorDataset(images, targets), batch_size=1)
+    if loader is None:
+        images = torch.randn(2, 3, 8, 8)
+        targets = torch.zeros_like(images)
+        loader = DataLoader(TensorDataset(images, targets), batch_size=1)
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
     trainer = Trainer(
         model,
-        BatchStream(loader),
+        loader,
         optimizer,
         nn.MSELoss(),
         torch.device("cpu"),
@@ -78,3 +82,82 @@ def test_completed_resume_still_exports_weights(tmp_path):
     trainer.fit(steps=2, save_every=1, run_dir=tmp_path)
     assert (tmp_path / "model.pt").is_file()
     assert (tmp_path / "checkpoint.pt").is_file()
+
+
+def test_batches_start_on_first_step_and_repeat_across_epochs(tmp_path, monkeypatch):
+    starts = []
+    original_iter = DataLoader.__iter__
+
+    def record_iter(loader):
+        starts.append(True)
+        return original_iter(loader)
+
+    monkeypatch.setattr(DataLoader, "__iter__", record_iter)
+    trainer, _, _ = make_trainer()
+    assert starts == []
+
+    trainer.fit(steps=5, save_every=5, run_dir=tmp_path)
+
+    assert len(starts) == 3
+    assert trainer.step_idx == 5
+
+
+def test_completed_resume_does_not_start_loader(tmp_path, monkeypatch):
+    def unexpected_iter(loader):
+        raise AssertionError("completed training must not start data workers")
+
+    monkeypatch.setattr(DataLoader, "__iter__", unexpected_iter)
+    trainer, _, _ = make_trainer()
+    trainer.step_idx = 2
+    trainer.fit(steps=2, save_every=1, run_dir=tmp_path)
+    assert (tmp_path / "model.pt").is_file()
+
+
+def test_restore_starts_a_fresh_data_pass(tmp_path):
+    images = torch.stack((torch.zeros(3, 8, 8), torch.ones(3, 8, 8)))
+    loader = DataLoader(TensorDataset(images, torch.zeros_like(images)), batch_size=1)
+    trainer, model, _ = make_trainer(loader)
+    seen = []
+    model.register_forward_pre_hook(lambda module, args: seen.append(args[0].clone()))
+    trainer.fit(steps=1, save_every=1, run_dir=tmp_path)
+
+    trainer.restore(tmp_path / "checkpoint.pt")
+    trainer.fit(steps=2, save_every=1, run_dir=tmp_path / "resumed")
+
+    assert len(seen) == 2
+    torch.testing.assert_close(seen[0], images[:1])
+    torch.testing.assert_close(seen[1], images[:1])
+
+
+def test_training_matches_manual_updates_across_epochs(tmp_path):
+    torch.manual_seed(23)
+    images = torch.randn(2, 3, 8, 8)
+    targets = torch.randn_like(images)
+    loader = DataLoader(TensorDataset(images, targets), batch_size=1)
+    trainer, model, _ = make_trainer(loader)
+    expected = deepcopy(model)
+    optimizer = torch.optim.AdamW(expected.parameters(), lr=1e-2)
+    losses = []
+    for step in range(5):
+        idx = step % len(images)
+        optimizer.zero_grad(set_to_none=True)
+        loss = nn.functional.mse_loss(
+            expected(images[idx : idx + 1]), targets[idx : idx + 1]
+        )
+        loss.backward()
+        optimizer.step()
+        losses.append(float(loss.detach()))
+
+    trainer.fit(steps=5, save_every=5, run_dir=tmp_path)
+
+    for actual, reference in zip(
+        model.parameters(), expected.parameters(), strict=True
+    ):
+        torch.testing.assert_close(actual, reference, rtol=0, atol=0)
+    metrics = [
+        json.loads(line)
+        for line in (tmp_path / "metrics.jsonl").read_text().splitlines()
+    ]
+    assert metrics == [
+        {"step": step, "loss": loss} for step, loss in enumerate(losses, 1)
+    ]

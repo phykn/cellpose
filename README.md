@@ -81,8 +81,9 @@ Settings use explicit CLI values, then YAML values, then code defaults.
 Relative data, backbone, and resume paths in YAML are resolved against the
 project root, even when the YAML is inside a run directory. This preserves
 previous project-root invocations; callers formerly relying on another working
-directory should supply absolute paths. CLI input/output paths remain relative
-to the working directory. `--device` only overrides YAML when supplied.
+directory should supply absolute paths. CLI paths, including `--resume` and
+`--weights`, are relative to the working directory. `--device` only overrides
+YAML when supplied.
 
 Set `train.resume` or pass `--resume` to continue in a new run directory:
 
@@ -134,7 +135,8 @@ score per reconstructed mask. Classification weights use a version 2
 The default mask reconstruction uses a logit threshold of `0`, 200 flow steps,
 a flow-consistency threshold of `0.4`, and a minimum mask size of 15 pixels.
 PNG output supports labels through 65535; larger instance IDs require TIFF or
-NumPy output. Tile accumulation uses float32 for float16/bfloat16 predictions
+NumPy output. Output extensions are case-insensitive and the requested filename
+is preserved. Tile accumulation uses float32 for float16/bfloat16 predictions
 to avoid overflow, while the differentiable `run_tiled` function retains
 input and parameter gradients.
 
@@ -167,7 +169,10 @@ weights.
 Configuration loading and model assembly check backbone names, patch stride,
 and class vocabularies before allocating an encoder. `Trainer.restore` restores
 training state and keeps the effective optimizer settings in the saved
-configuration.
+configuration. The trainer owns the data loader's batch iteration: it starts
+on the first training step, cycles at epoch boundaries, and starts a fresh
+data pass after restoration. Exporting an already completed run does not start
+data workers.
 `data.image.read_mask` decodes mask files without changing integer instance IDs,
 and `prepare.mask` owns shared mask validation and renumbering. Integer-valued
 floating masks remain accepted when their labels fit in int64.

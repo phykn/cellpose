@@ -54,7 +54,8 @@ def write_mask(path: str | Path, masks: np.ndarray) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     suffix = path.suffix.lower()
     if suffix == ".npy":
-        np.save(path, masks, allow_pickle=False)
+        with path.open("wb") as file:
+            np.save(file, masks, allow_pickle=False)
     elif suffix in {".tif", ".tiff"}:
         tifffile.imwrite(path, masks)
     elif suffix == ".png":

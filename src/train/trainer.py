@@ -11,26 +11,11 @@ from ..model.config import prediction_config
 from .checkpoint import load_checkpoint, save_checkpoint
 
 
-class BatchStream:
-    def __init__(self, loader: DataLoader) -> None:
-        if len(loader) == 0:
-            raise ValueError("training loader must contain at least one batch.")
-        self.loader = loader
-        self.iterator = iter(loader)
-
-    def next(self) -> tuple[torch.Tensor, torch.Tensor]:
-        try:
-            return next(self.iterator)
-        except StopIteration:
-            self.iterator = iter(self.loader)
-            return next(self.iterator)
-
-
 class Trainer:
     def __init__(
         self,
         model: nn.Module,
-        stream: BatchStream,
+        loader: DataLoader,
         optimizer: torch.optim.Optimizer,
         criterion: nn.Module,
         device: torch.device,
@@ -38,6 +23,8 @@ class Trainer:
         start_step: int = 0,
         cfg: dict | None = None,
     ) -> None:
+        if len(loader) == 0:
+            raise ValueError("training loader must contain at least one batch.")
         if not isinstance(mixed_precision, bool):
             raise TypeError("mixed_precision must be a boolean.")
         if not isinstance(start_step, int) or isinstance(start_step, bool):
@@ -45,7 +32,8 @@ class Trainer:
         if start_step < 0:
             raise ValueError("start_step must be non-negative.")
         self.model = model
-        self.stream = stream
+        self.loader = loader
+        self._batches = None
         self.optimizer = optimizer
         self.criterion = criterion
         self.device = device
@@ -63,6 +51,7 @@ class Trainer:
             scaler=self.scaler,
             cfg=self.cfg,
         )
+        self._batches = None
         if self.cfg is not None:
             self.cfg["optim"]["learning_rate"] = self.optimizer.param_groups[0]["lr"]
             self.cfg["optim"]["weight_decay"] = self.optimizer.param_groups[0][
@@ -95,7 +84,7 @@ class Trainer:
 
     def step(self) -> float:
         self.model.train()
-        image, target = self.stream.next()
+        image, target = self._next_batch()
         image = image.to(self.device, non_blocking=True)
         target = target.to(self.device, non_blocking=True)
         self.optimizer.zero_grad(set_to_none=True)
@@ -110,6 +99,15 @@ class Trainer:
         self.scaler.step(self.optimizer)
         self.scaler.update()
         return float(loss.detach())
+
+    def _next_batch(self) -> tuple[torch.Tensor, torch.Tensor]:
+        if self._batches is None:
+            self._batches = iter(self.loader)
+        try:
+            return next(self._batches)
+        except StopIteration:
+            self._batches = iter(self.loader)
+            return next(self._batches)
 
     def save(self, run_dir: Path) -> None:
         save_weights(run_dir / "model.pt", self.model)

@@ -31,6 +31,7 @@ class SmallEncoder(nn.Module):
 def test_train_resume_and_predict_from_saved_configuration(
     tmp_path, monkeypatch, classification
 ):
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "src.build.build_dinov3", lambda *args, **kwargs: SmallEncoder()
     )
@@ -60,9 +61,10 @@ def test_train_resume_and_predict_from_saved_configuration(
         cfg["train"]["weights"] = str(initial)
     save_yaml(config, cfg)
     first, second = tmp_path / "first", tmp_path / "second"
-    monkeypatch.setattr(
-        sys, "argv", ["run_train.py", "--config", str(config), "--run-dir", str(first)]
-    )
+    argv = ["run_train.py", "--config", str(config), "--run-dir", str(first)]
+    if classification:
+        argv += ["--weights", "segmentation.pt"]
+    monkeypatch.setattr(sys, "argv", argv)
     run_train.main()
     effective = load_yaml(first / "train.yaml")
     assert effective["device"] == "cpu"
@@ -82,7 +84,7 @@ def test_train_resume_and_predict_from_saved_configuration(
             "--run-dir",
             str(second),
             "--resume",
-            str(first / "checkpoint.pt"),
+            "first/checkpoint.pt",
         ],
     )
     run_train.main()
@@ -95,7 +97,7 @@ def test_train_resume_and_predict_from_saved_configuration(
 
     # A changed source YAML must not alter inference for already exported weights.
     save_yaml(config, {"model": {"patch_stride": 16}})
-    output = tmp_path / "prediction.npy"
+    output = tmp_path / ("prediction.NPY" if classification else "prediction.npy")
     monkeypatch.setattr(
         sys,
         "argv",

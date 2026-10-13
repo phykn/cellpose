@@ -22,6 +22,18 @@ def test_png_preserves_supported_labels(tmp_path):
     np.testing.assert_array_equal(read_array(path), mask)
 
 
+@pytest.mark.parametrize("suffix", [".npy", ".NPY", ".Npy"])
+def test_numpy_mask_output_keeps_requested_filename(tmp_path, suffix):
+    mask = np.array([[0, 1, 65536]], dtype=np.uint32)
+    path = tmp_path / f"mask{suffix}"
+
+    write_mask(path, mask)
+
+    assert path.is_file()
+    assert sorted(tmp_path.iterdir()) == [path]
+    np.testing.assert_array_equal(read_mask(path), mask)
+
+
 @pytest.mark.parametrize("suffix", [".npy", ".tiff"])
 def test_mask_io_preserves_large_unsigned_ids(tmp_path, suffix):
     mask = np.array([[0, 2**63 + 7, 2**64 - 1]], dtype=np.uint64)

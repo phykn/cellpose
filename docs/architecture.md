@@ -46,6 +46,10 @@ coordinates training-state restoration and saving: `Trainer.restore` restores th
 model, optimizer, scaler, RNG and completed step, then records the restored
 optimizer settings in its effective configuration. Assembly only requests the
 restore; it does not manipulate the trainer's scaler or completed step.
+`Trainer` also owns batch iteration. It begins a data pass on the first step,
+after restoration, and restarts at epoch boundaries. Restoring a reused trainer
+starts a fresh data pass on its next step. A completed run can export weights
+without starting data workers.
 `Trainer.save` exports weights, metadata and training state. Training input
 paths are required by dataset assembly, so inference configurations do not need
 training images or masks.
@@ -117,6 +121,12 @@ repository's complete model state dictionaries.
 - Resumed training restores scaler and process RNG state; a run already at the
   requested final step still exports weights. Data order/prefetch resume is not
   implemented. Saved settings record restored optimizer hyperparameters.
+- CLI `--resume` and `--weights` resolve against the working directory, while
+  paths saved in YAML still resolve against the project root. Previously the
+  CLI overrides also used the project root, selecting the wrong file when
+  invoked from another directory.
+- NumPy mask export preserves `.NPY` and mixed-case filenames. Previously
+  NumPy silently appended `.npy` to these already supported extensions.
 - Explicit device overrides take precedence over saved settings, and inference
   defaults to the weight's saved configuration rather than today's training YAML.
 - Saved configurations with omitted model defaults are treated like the equivalent

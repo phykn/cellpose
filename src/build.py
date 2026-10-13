@@ -9,7 +9,7 @@ from .model.cellpose import CellposeDINO
 from .model.config import MODEL_DEFAULTS, validate_model_config
 from .model.dinov3 import build_dinov3
 from .train.loss import CellposeLoss
-from .train.trainer import BatchStream, Trainer
+from .train.trainer import Trainer
 
 
 def build_model(
@@ -100,7 +100,7 @@ def build_trainer(cfg: dict, device: torch.device) -> Trainer:
     )
     trainer = Trainer(
         model,
-        BatchStream(loader),
+        loader,
         optimizer,
         CellposeLoss(train.get("class_loss_weight", 1.0)),
         device,

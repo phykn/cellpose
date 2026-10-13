@@ -60,10 +60,10 @@ def load_config(
         device or cfg.get("device") or ("cuda" if torch.cuda.is_available() else "cpu")
     )
     if resume is not None:
-        cfg["train"]["resume"] = str(resume)
+        cfg["train"]["resume"] = str(Path(resume).expanduser().resolve())
         cfg["train"]["weights"] = None
     if weights is not None:
-        cfg["train"]["weights"] = str(weights)
+        cfg["train"]["weights"] = str(Path(weights).expanduser().resolve())
         if resume is None:
             cfg["train"]["resume"] = None
     if cfg["device"] not in ("cpu", "cuda"):
