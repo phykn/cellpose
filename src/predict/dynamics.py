@@ -3,7 +3,7 @@
 
 import numpy as np
 import torch
-from scipy.ndimage import binary_fill_holes, maximum_filter
+from scipy.ndimage import binary_fill_holes, find_objects, maximum_filter
 
 from .. import FLOW_SCALE
 from ..prepare.flow import check_niter, masks_to_flows
@@ -157,12 +157,13 @@ def _remove_bad_flow_masks(
     flow_logits: np.ndarray,
     threshold: float,
 ) -> np.ndarray:
+    masks = renumber_masks(masks)
     expected = masks_to_flows(masks)
     predicted = flow_logits.astype(np.float32, copy=False) / FLOW_SCALE
     error = np.square(expected - predicted).sum(axis=0)
     bad = []
-    for label in range(1, int(masks.max()) + 1):
-        value = error[masks == label].mean()
+    for label, region in enumerate(find_objects(masks), start=1):
+        value = error[region][masks[region] == label].mean()
         if value > threshold:
             bad.append(label)
     if bad:
@@ -172,16 +173,14 @@ def _remove_bad_flow_masks(
 
 
 def _fill_and_filter_masks(masks: np.ndarray, min_size: int) -> np.ndarray:
+    masks = renumber_masks(masks)
     output = np.zeros(masks.shape, dtype=np.int32)
     next_label = 1
-    for label in np.unique(masks):
-        if label == 0:
+    for label, region in enumerate(find_objects(masks), start=1):
+        selected = masks[region] == label
+        if min_size > 0 and np.count_nonzero(selected) < min_size:
             continue
-        y, x = np.nonzero(masks == label)
-        if min_size > 0 and len(y) < min_size:
-            continue
-        region = np.s_[y.min() : y.max() + 1, x.min() : x.max() + 1]
-        filled = binary_fill_holes(masks[region] == label)
+        filled = binary_fill_holes(selected)
         filled &= (masks[region] == 0) | (masks[region] == label)
         output[region][filled] = next_label
         next_label += 1

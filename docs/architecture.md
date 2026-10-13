@@ -21,6 +21,10 @@ integer mask arrays and renumbering, independently of flow calculations.
 mask-to-flow conversion used both to create training targets and to check
 predicted masks. `predict.dynamics` owns endpoint integration, instance
 construction, flow consistency filtering, hole filling, and size filtering.
+Instance classification and mask cleanup use per-instance bounding boxes instead
+of scanning the whole image for every object. Compact label indices retain sparse
+original IDs without allocating arrays proportional to the largest ID; class
+targets use the same compact-index mapping to avoid repeated image scans.
 Putting all flow math in `predict` would make the training dataset depend on
 the inference layer; putting it all in `data` would couple inference to loading.
 

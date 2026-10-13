@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.ndimage import find_objects
 from scipy.special import softmax
 
 
@@ -12,11 +13,15 @@ def classify_instances(
     if not np.isfinite(logits).all():
         raise ValueError("class logits must contain only finite values.")
     probs = softmax(logits, axis=0)
+    mask_ids, inverse = np.unique(masks, return_inverse=True)
+    # Compact labels keep bounding-box lookup independent of the largest ID.
+    regions = find_objects(inverse.reshape(masks.shape) + 1)
     instances = []
-    for mask_id in np.unique(masks):
+    for mask_id, region in zip(mask_ids, regions):
         if mask_id == 0:
             continue
-        scores = probs[:, masks == mask_id].mean(axis=1)
+        region_probs = probs[(slice(None), *region)]
+        scores = region_probs[:, masks[region] == mask_id].mean(axis=1)
         class_id = int(scores.argmax())
         instances.append(
             {

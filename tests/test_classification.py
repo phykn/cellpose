@@ -6,7 +6,7 @@ from src import FLOW_SCALE, build
 from src.checkpoint import load_weights, save_weights
 from src.config import save_yaml
 from src.data.dataset import CellposeDataset
-from src.data.label import read_labels
+from src.data.label import class_target, read_labels
 from src.model.cellpose import CellposeDINO
 from src.predict.classify import classify_instances
 from src.predict.inference import predict
@@ -15,6 +15,44 @@ from src.prepare.flow import flow_targets
 from src.train.checkpoint import load_checkpoint, save_checkpoint
 from src.train.loss import CellposeLoss
 from tests.model.test_cellpose import FakeEncoder
+
+
+@pytest.mark.parametrize("kind", ["empty", "full", "sparse"])
+def test_instance_targets_and_scores_preserve_original_ids(kind):
+    from scipy.special import softmax
+
+    masks = np.zeros((23, 31), dtype=np.uint64)
+    largest_id = np.iinfo(np.uint64).max
+    if kind == "full":
+        masks[:] = largest_id
+    elif kind == "sparse":
+        masks[1:5, 2:8] = 7
+        masks[15:19, 20:29] = 7
+        masks[4:15, 10:17] = largest_id
+    labels = {7: 2, int(largest_id): 1}
+    logits = np.random.default_rng(19).normal(size=(3, *masks.shape)).astype(np.float32)
+    classes = ("A", "B", "C")
+    probs = softmax(logits, axis=0)
+    expected_target = np.full(masks.shape, -1, dtype=np.float32)
+    expected_instances = []
+    for mask_id in np.unique(masks):
+        if mask_id == 0:
+            continue
+        selected = masks == mask_id
+        expected_target[selected] = labels[int(mask_id)]
+        scores = probs[:, selected].mean(axis=1)
+        class_id = int(scores.argmax())
+        expected_instances.append(
+            {
+                "mask_id": int(mask_id),
+                "class_id": class_id,
+                "class_name": classes[class_id],
+                "score": float(scores[class_id]),
+            }
+        )
+
+    np.testing.assert_array_equal(class_target(masks, labels), expected_target)
+    assert classify_instances(masks, logits, classes) == tuple(expected_instances)
 
 
 def test_class_targets_follow_original_ids_through_random_augmentation(tmp_path):

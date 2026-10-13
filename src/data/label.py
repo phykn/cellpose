@@ -45,8 +45,9 @@ def read_labels(
 
 def class_target(masks: np.ndarray, labels: dict[int, int]) -> np.ndarray:
     # Background and augmentation padding never supervise an object class.
-    target = np.full(masks.shape, -1, dtype=np.float32)
-    for mask_id in np.unique(masks):
+    mask_ids, inverse = np.unique(masks, return_inverse=True)
+    values = np.full(len(mask_ids), -1, dtype=np.float32)
+    for idx, mask_id in enumerate(mask_ids):
         if mask_id > 0:
-            target[masks == mask_id] = labels[int(mask_id)]
-    return target
+            values[idx] = labels[int(mask_id)]
+    return values[inverse].reshape(masks.shape)

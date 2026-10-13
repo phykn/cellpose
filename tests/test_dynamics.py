@@ -170,3 +170,16 @@ def test_hole_filling_preserves_enclosed_instances(outer, inner):
 
     assert set(np.unique(result)) == {0, 1, 2}
     assert result[4, 4] != result[16, 16]
+
+
+def test_mask_cleanup_preserves_sparse_labels_and_disconnected_regions():
+    masks = np.zeros((24, 32), dtype=np.int32)
+    masks[1:6, 2:8] = 9
+    masks[15:21, 23:29] = 9
+    masks[8:12, 10:14] = 3
+    masks[2, 20] = 5
+    expected = np.zeros_like(masks)
+    expected[masks == 3] = 1
+    expected[masks == 9] = 2
+
+    np.testing.assert_array_equal(_fill_and_filter_masks(masks, 15), expected)
