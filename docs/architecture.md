@@ -106,6 +106,10 @@ repository's complete model state dictionaries.
 
 ## Verified corrections
 
+- Image normalization preserves large integer offsets and float64 intensity
+  differences before converting to float32. Previously an early float32 cast
+  could turn a varying image into zeros. Complex inputs and normalized values
+  outside the float32 range now raise errors instead of silently losing data.
 - Hole filling preserves pixels belonging to other instances. Previously an
   enclosing mask could overwrite an inner object, making it disappear depending
   on label order.

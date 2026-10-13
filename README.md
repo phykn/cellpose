@@ -60,9 +60,10 @@ data/train/masks/sample_001.tif
 
 Supported inputs are `.npy`, `.png`, `.jpg`, `.tif`, and `.tiff`. Masks must
 be 2D, use `0` for background, and positive integers for instances. Images may
-be grayscale or contain one to three channels. Grayscale is mapped to
-`[gray, 0, 0]`; each nonconstant channel is normalized by its 1st and 99th
-percentiles without clipping.
+be finite real arrays, either grayscale or with one to three channels. Grayscale
+is mapped to `[gray, 0, 0]`; each nonconstant channel is normalized by its 1st and 99th
+percentiles without clipping. Normalization retains input intensity differences
+before producing float32 tensors; outputs exceeding the float32 range are rejected.
 
 Set the data paths and training options in `config/train.yaml`, then run:
 

@@ -11,8 +11,8 @@ def normalize_image(
         raise ValueError(
             "image must have two spatial dimensions and up to three channels."
         )
-    if not np.issubdtype(image.dtype, np.number):
-        raise TypeError("image must contain numeric values.")
+    if not np.issubdtype(image.dtype, np.number) or np.iscomplexobj(image):
+        raise TypeError("image must contain real numeric values.")
     if image.size == 0:
         raise ValueError("image must not be empty.")
 
@@ -32,11 +32,26 @@ def normalize_image(
         raise ValueError("image must contain only finite values.")
 
     result = np.zeros((3, *channels.shape[1:]), dtype=np.float32)
-    for idx, channel in enumerate(channels):
-        values = channel.astype(np.float32, copy=False)
-        low, high = np.percentile(values, (1.0, 99.0))
-        if high > low:
-            result[idx] = (values - low) / (high - low)
+    try:
+        with np.errstate(over="raise", invalid="raise", divide="raise"):
+            for idx, channel in enumerate(channels):
+                if np.issubdtype(channel.dtype, np.integer):
+                    # Unsigned differences preserve even adjacent int64/uint64 values.
+                    values = channel.astype(np.uint64)
+                    values -= channel.min().astype(np.uint64)
+                    values = values.astype(np.float64)
+                else:
+                    values = channel.astype(np.float64, copy=False)
+                if np.abs(values).max() > np.finfo(np.float64).max / 2:
+                    # Halving preserves normalization and keeps subtraction finite.
+                    values = values / 2
+                low, high = np.percentile(values, (1.0, 99.0))
+                if high > low:
+                    result[idx] = (values - low) / (high - low)
+    except FloatingPointError as exc:
+        raise ValueError(
+            "image cannot be normalized to finite float32 values."
+        ) from exc
     return result
 
 
