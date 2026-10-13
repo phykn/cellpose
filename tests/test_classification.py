@@ -114,6 +114,23 @@ def test_empty_half_precision_crop_does_not_overflow_class_reduction():
     assert torch.isfinite(loss)
 
 
+@pytest.mark.parametrize("value", [1e38, float("inf"), float("nan")])
+def test_empty_crop_class_logits_do_not_affect_loss_or_gradients(value):
+    output = torch.zeros(1, 5, 16, 16, requires_grad=True)
+    with torch.no_grad():
+        output[:, 3:] = value
+    target = torch.zeros(1, 4, 16, 16)
+    target[:, 3] = -1
+
+    loss = CellposeLoss()(output, target)
+
+    expected = CellposeLoss()(output[:, :3], target[:, :3])
+    torch.testing.assert_close(loss, expected)
+    loss.backward()
+    assert torch.isfinite(output.grad).all()
+    assert not output.grad[:, 3:].any()
+
+
 def test_prediction_assigns_classes_to_reconstructed_mask_ids():
     masks = np.zeros((32, 32), dtype=np.int32)
     masks[3:9, 3:9] = 2

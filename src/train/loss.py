@@ -39,7 +39,7 @@ class CellposeLoss(nn.Module):
             class_loss = (
                 F.cross_entropy(class_logits[valid].float(), labels[valid])
                 if valid.any()
-                else class_logits.float().sum() * 0.0
+                else class_logits[..., :0].float().sum()
             )
             loss = loss + self.class_loss_weight * class_loss
         return loss
