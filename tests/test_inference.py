@@ -158,3 +158,36 @@ def test_predict_returns_original_shape_for_an_empty_prediction(
         "max_size_fraction": 0.3,
         "device": torch.device("cpu"),
     }
+
+
+@pytest.mark.parametrize("training", [False, True])
+@pytest.mark.parametrize("fail", [False, True])
+def test_predict_restores_each_modules_mode(training, fail):
+    class MixedModeModel(nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.block = nn.Sequential(nn.Dropout(), nn.BatchNorm2d(3))
+
+        def forward(self, image):
+            assert torch.is_inference_mode_enabled()
+            assert all(not module.training for module in self.modules())
+            if fail:
+                raise RuntimeError("forward failed")
+            output = torch.zeros_like(image)
+            output[:, 2] = -10
+            return output
+
+    model = MixedModeModel()
+    model.train(training)
+    model.block.train(not training)
+    model.block[1].train(training)
+    modes = [module.training for module in model.modules()]
+    image = np.zeros((16, 16), dtype=np.float32)
+
+    if fail:
+        with pytest.raises(RuntimeError, match="forward failed"):
+            predict(model, image, "cpu", tile_size=16)
+    else:
+        assert not predict(model, image, "cpu", tile_size=16).masks.any()
+
+    assert [module.training for module in model.modules()] == modes

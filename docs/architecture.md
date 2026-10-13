@@ -29,7 +29,8 @@ the inference layer; putting it all in `data` would couple inference to loading.
 crops back to the original input extent. Accumulators cover the padded image
 once; each tile updates a slice rather than allocating another full-image
 tensor. Overlap sums use at least float32. `predict.inference` owns eval and
-inference mode and restores the previous model mode even if forward fails.
+inference mode and restores each module's previous training flag even if forward
+fails, including models with independently configured child modes.
 
 `checkpoint.py` handles plain state dictionaries shared by assembly and training.
 `train.checkpoint` handles optimizer, scaler, step, configuration and RNG state.

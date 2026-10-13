@@ -38,9 +38,9 @@ def predict(
     device = torch.device(device)
     normalized = normalize_image(image, channel_axis=channel_axis)
     inputs = torch.from_numpy(normalized).unsqueeze(0).to(device)
-    was_training = model.training
-    model.eval()
+    modes = [(module, module.training) for module in model.modules()]
     try:
+        model.eval()
         with torch.inference_mode():
             output = run_tiled(
                 model,
@@ -56,7 +56,9 @@ def predict(
                 else None
             )
     finally:
-        model.train(was_training)
+        for module, training in modes:
+            # train() would overwrite independently configured child modes.
+            module.training = training
     masks = compute_masks(
         flow_logits,
         cell_logits,
