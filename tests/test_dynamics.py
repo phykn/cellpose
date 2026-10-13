@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from src import FLOW_SCALE
-from src.predict.dynamics import compute_masks, follow_flows
+from src.predict.dynamics import _fill_and_filter_masks, compute_masks, follow_flows
 from src.prepare.flow import flow_targets, masks_to_flows
 
 
@@ -143,3 +143,30 @@ def test_small_masks_and_bad_flows_are_filtered() -> None:
     )
     assert without_qc.max() == 1
     assert with_qc.max() == 0
+
+
+@pytest.mark.parametrize("outer, inner", [(1, 2), (2, 1)])
+def test_hole_filling_preserves_enclosed_instances(outer, inner):
+    masks = np.zeros((32, 32), dtype=np.int32)
+    masks[3:29, 3:29] = outer
+    masks[8:24, 8:24] = 0
+    masks[13:19, 13:19] = inner
+
+    filled = _fill_and_filter_masks(masks, min_size=15)
+
+    assert set(np.unique(filled)) == {0, 1, 2}
+    assert filled[4, 4] != filled[16, 16]
+    assert np.all(filled[3:29, 3:29] > 0)
+    assert np.all(filled[masks == outer] == filled[4, 4])
+    assert np.all(filled[masks == inner] == filled[16, 16])
+
+    targets = flow_targets(masks)
+    result = compute_masks(
+        targets[1:] * FLOW_SCALE,
+        np.where(masks > 0, 10.0, -10.0),
+        flow_threshold=None,
+        max_size_fraction=1.0,
+    )
+
+    assert set(np.unique(result)) == {0, 1, 2}
+    assert result[4, 4] != result[16, 16]

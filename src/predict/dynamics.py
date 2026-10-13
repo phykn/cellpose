@@ -182,8 +182,7 @@ def _fill_and_filter_masks(masks: np.ndarray, min_size: int) -> np.ndarray:
             continue
         region = np.s_[y.min() : y.max() + 1, x.min() : x.max() + 1]
         filled = binary_fill_holes(masks[region] == label)
-        if min_size > 0 and int(filled.sum()) < min_size:
-            continue
+        filled &= (masks[region] == 0) | (masks[region] == label)
         output[region][filled] = next_label
         next_label += 1
     return output

@@ -106,6 +106,9 @@ repository's complete model state dictionaries.
 
 ## Verified corrections
 
+- Hole filling preserves pixels belonging to other instances. Previously an
+  enclosing mask could overwrite an inner object, making it disappear depending
+  on label order.
 - Instance-center rounding now uses local bounding-box coordinates. Previously,
   a half-integer center in a box beginning on an odd coordinate could choose a
   different pixel than upstream. This intentionally changes those flow targets
